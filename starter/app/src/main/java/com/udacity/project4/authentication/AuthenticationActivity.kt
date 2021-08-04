@@ -10,6 +10,7 @@ import com.firebase.ui.auth.FirebaseAuthUIActivityResultContract
 import com.firebase.ui.auth.data.model.FirebaseAuthUIAuthenticationResult
 import com.google.firebase.auth.FirebaseAuth
 import com.udacity.project4.databinding.ActivityAuthenticationBinding
+import com.udacity.project4.locationreminders.RemindersActivity
 
 /**
  * This class should be the starting point of the app, It asks the users to sign in / register, and redirects the
@@ -40,20 +41,17 @@ class AuthenticationActivity : AppCompatActivity() {
 
     }
 
-    override fun onStart() {
-        super.onStart()
-        AuthUI.getInstance()
-            .signOut(this)
-            .addOnCompleteListener {
-                Log.i("yarab", "Logged Out")
-            }
-    }
-
     private fun onSignInResult(result: FirebaseAuthUIAuthenticationResult, RC_SIGN_IN: Int) {
         val response = result.idpResponse
         if (result.resultCode == RESULT_OK) {
             // Successfully signed in
             val user = FirebaseAuth.getInstance().currentUser
+            val intent = Intent(this, RemindersActivity::class.java).apply {
+
+                // Start new activity in new task
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            startActivity(intent)
             Toast.makeText(this, "this is the authorized user", Toast.LENGTH_LONG).show()
             Log.i("yarab", "$RC_SIGN_IN")
         } else {
