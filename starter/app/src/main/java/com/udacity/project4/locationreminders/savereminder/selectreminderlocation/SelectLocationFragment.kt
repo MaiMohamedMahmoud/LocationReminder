@@ -7,9 +7,11 @@ import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.content.res.Resources
+import android.location.Location
 import android.os.Bundle
 import android.util.Log
 import android.view.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.databinding.DataBindingUtil
@@ -34,7 +36,9 @@ import kotlin.properties.Delegates
 class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
     private lateinit var googleMap: GoogleMap
+    private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private var locationPermissionGranted = false
+    private lateinit var currentLocation: Location
 
     //Use Koin to get the view model of the SaveReminder
     override val _viewModel: SaveReminderViewModel by inject()
@@ -51,6 +55,8 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
         setHasOptionsMenu(true)
         setDisplayHomeAsUpEnabled(true)
+        fusedLocationProviderClient =
+            LocationServices.getFusedLocationProviderClient(this.requireActivity())
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used. Since this is a
         // Fragment within a Fragment we need to use childFragmentManager
@@ -83,9 +89,13 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         ) {
             locationPermissionGranted = true
         } else {
-            ActivityCompat.requestPermissions(
-                this.requireActivity(), arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION
+//            ActivityCompat.requestPermissions(
+//                this.requireActivity(), arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+//                PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION
+//            )
+
+            requestPermissions.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
             )
         }
     }
@@ -122,7 +132,81 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         this.googleMap = map
         //prompt user location permission
         getLocationPermission()
+        getDeviceLocation()
+    }
 
+    private val requestPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions())
+        { permissions ->
+            permissions.entries.forEach {
+                if (it.value) {
+                    locationPermissionGranted = true
+                    getDeviceLocation()
+                }
+            }
+        }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        Log.i("yarab", "inside onrequest ovveride")
+        locationPermissionGranted = false
+        when (requestCode) {
+            PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION -> {
+
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.isNotEmpty() &&
+                    grantResults[0] == PackageManager.PERMISSION_GRANTED
+                ) {
+                    locationPermissionGranted = true
+                }
+            }
+        }
+        getDeviceLocation()
+    }
+
+    private fun getDeviceLocation() {
+        /*
+         * Get the best and most recent location of the device, which may be null in rare
+         * cases when a location is not available.
+         */
+        Log.i("yarab inside device l", locationPermissionGranted.toString())
+        try {
+            if (locationPermissionGranted) {
+                val locationResult = fusedLocationProviderClient.lastLocation
+                locationResult.addOnCompleteListener(this.requireActivity()) { task ->
+                    if (task.isSuccessful) {
+                        // Set the map's camera position to the current location of the device.
+                        currentLocation = task.result!!
+                        if (currentLocation != null) {
+                            addCurrentLocation()
+                        }
+                    } else {
+                        Log.e("yarab", "inside else")
+                    }
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e("Exception: %s", e.message, e)
+        }
+    }
+
+    private fun addCurrentLocation() {
+        val locationPoint = LatLng(currentLocation.latitude, currentLocation.longitude)
+
+        googleMap?.moveCamera(
+            CameraUpdateFactory.newLatLngZoom(
+                locationPoint, DEFAULT_ZOOM.toFloat()
+            )
+        )
+        googleMap.addMarker(getMarkerOption(locationPoint))
+    }
+
+    private fun getMarkerOption(position: LatLng): MarkerOptions {
+        return MarkerOptions()
+            .position(position).title("Home")
     }
 
 
